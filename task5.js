@@ -1,17 +1,20 @@
+// ==========================================
+// ПАТЕРНИ: СТЕЙТ, КОМАНДА, ВІДВІДУВАЧ
+// ==========================================
+
+// --- ПАТЕРН СТЕЙТ (State) ---
+class VisibleState {
+    render(node) { return node.baseRender(); }
+}
+class HiddenState {
+    render(node) { return ""; } // Прихований елемент повертає порожній рядок
+}
+
 // --- ПАТЕРН КОМАНДА (Command) ---
 class AddClassCommand {
-    constructor(node, className) {
-        this.node = node;
-        this.className = className;
-    }
-    execute() {
-        this.node.cssClasses.push(this.className);
-        console.log(`[Command]: Додано клас '${this.className}'`);
-    }
-    undo() {
-        this.node.cssClasses = this.node.cssClasses.filter(c => c !== this.className);
-        console.log(`[Command]: Скасовано додавання класу '${this.className}'`);
-    }
+    constructor(node, className) { this.node = node; this.className = className; }
+    execute() { this.node.cssClasses.push(this.className); }
+    undo() { this.node.cssClasses = this.node.cssClasses.filter(c => c !== this.className); }
 }
 
 // --- ПАТЕРН ВІДВІДУВАЧ (Visitor) ---
@@ -21,7 +24,10 @@ class NodeVisitor {
     visitText(textNode) { this.charCount += textNode.text.length; }
 }
 
-// Базовий клас для всіх вузлів
+// ==========================================
+// БАЗОВІ КЛАСИ LIGHT HTML
+// ==========================================
+
 class LightNode {
     // --- ПАТЕРН ШАБЛОННИЙ МЕТОД ---
     render() {
@@ -36,11 +42,10 @@ class LightNode {
     onBeforeRender() {}
     onAfterRender() {}
 
-    generateHTML() { throw new Error("Метод має бути реалізований"); }
-    accept(visitor) { throw new Error("Метод має бути реалізований"); }
+    generateHTML() { throw new Error("Not implemented"); }
+    accept(visitor) { throw new Error("Not implemented"); }
 }
 
-// Вузол для тексту
 class LightTextNode extends LightNode {
     constructor(text) {
         super();
@@ -53,7 +58,6 @@ class LightTextNode extends LightNode {
     accept(visitor) { visitor.visitText(this); }
 }
 
-// Вузол для HTML-елементів
 class LightElementNode extends LightNode {
     constructor(tagName, displayType, closingType, cssClasses = []) {
         super();
@@ -62,6 +66,10 @@ class LightElementNode extends LightNode {
         this.closingType = closingType; 
         this.cssClasses = cssClasses; 
         this.children = []; 
+        
+        // Встановлюємо початковий стан (VisibleState)
+        this.state = new VisibleState(); 
+        
         this.onCreated();
     }
 
@@ -74,26 +82,27 @@ class LightElementNode extends LightNode {
     *[Symbol.iterator]() {
         yield this;
         for (const child of this.children) {
-            if (child instanceof LightElementNode) {
-                yield* child;
-            } else if (child instanceof LightNode) {
-                yield child;
-            }
+            if (child instanceof LightElementNode) yield* child;
+            else if (child instanceof LightNode) yield child;
         }
     }
 
     // --- ПАТЕРН ВІДВІДУВАЧ ---
     accept(visitor) {
         visitor.visitElement(this);
-        for (const child of this.children) {
-            child.accept(visitor);
-        }
+        for (const child of this.children) child.accept(visitor);
     }
 
     get childrenCount() { return this.children.length; }
     get innerHTML() { return this.children.map(child => child.outerHTML).join(""); }
 
+    // Генерація HTML делегується Стейту
     generateHTML() {
+        return this.state.render(this);
+    }
+
+    // Реальна логіка рендеру, яку викликає VisibleState
+    baseRender() {
         const classes = this.cssClasses.length > 0 ? ` class="${this.cssClasses.join(" ")}"` : "";
         if (this.closingType === "single") {
             return `<${this.tagName}${classes}/>`; 
@@ -106,24 +115,23 @@ class LightElementNode extends LightNode {
     onBeforeRender() {}
 }
 
-// --- Тестування ---
+// ==========================================
+// ТЕСТУВАННЯ СТЕЙТУ
+// ==========================================
 const table = new LightElementNode("table", "block", "double", ["my-table"]);
 const tr = new LightElementNode("tr", "block", "double");
 const td1 = new LightElementNode("td", "inline", "double");
-const td2 = new LightElementNode("td", "inline", "double");
 
-td1.addChild(new LightTextNode("Колонка 1"));
-td2.addChild(new LightTextNode("Колонка 2"));
+td1.addChild(new LightTextNode("Дані"));
 tr.addChild(td1);
-tr.addChild(td2);
 table.addChild(tr);
 
-console.log("=== ПЕРЕВІРКА КОМАНДИ (Command) ===");
-console.log("До:", table.outerHTML);
+console.log("=== ПЕРЕВІРКА СТЕЙТУ (State) ===");
+console.log("Звичайний рендер (VisibleState):");
+console.log(table.outerHTML);
 
-const highlightCmd = new AddClassCommand(table, "bg-dark");
-highlightCmd.execute(); // Застосовуємо команду
-console.log("Після додавання:", table.outerHTML);
+console.log("\nМіняємо стан рядка <tr> на HiddenState...");
+tr.state = new HiddenState(); // Тепер рядок прихований
 
-highlightCmd.undo(); // Скасовуємо дію
-console.log("Після скасування (Undo):", table.outerHTML);
+console.log("Рендер таблиці після зміни стану (рядок зникне):");
+console.log(table.outerHTML);
