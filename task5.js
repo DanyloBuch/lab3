@@ -1,3 +1,17 @@
+// --- ПАТЕРН ВІДВІДУВАЧ (Visitor) ---
+class NodeVisitor {
+    constructor() {
+        this.tagCount = 0;
+        this.charCount = 0;
+    }
+    visitElement(node) {
+        this.tagCount++;
+    }
+    visitText(textNode) {
+        this.charCount += textNode.text.length;
+    }
+}
+
 // Базовий клас для всіх вузлів
 class LightNode {
     // --- ПАТЕРН ШАБЛОННИЙ МЕТОД ---
@@ -14,6 +28,7 @@ class LightNode {
     onAfterRender() {}
 
     generateHTML() { throw new Error("Метод має бути реалізований"); }
+    accept(visitor) { throw new Error("Метод має бути реалізований"); }
 }
 
 // Вузол для тексту
@@ -27,6 +42,9 @@ class LightTextNode extends LightNode {
     generateHTML() { return this.text; }
     get outerHTML() { return this.render(); }
     get innerHTML() { return this.text; }
+    
+    // Приймаємо відвідувача
+    accept(visitor) { visitor.visitText(this); }
 }
 
 // Вузол для HTML-елементів
@@ -48,13 +66,21 @@ class LightElementNode extends LightNode {
 
     // --- ПАТЕРН ІТЕРАТОР ---
     *[Symbol.iterator]() {
-        yield this; // Повертаємо поточний вузол
+        yield this;
         for (const child of this.children) {
             if (child instanceof LightElementNode) {
-                yield* child; // Рекурсивно йдемо вглиб
+                yield* child;
             } else if (child instanceof LightNode) {
                 yield child;
             }
+        }
+    }
+
+    // --- ПАТЕРН ВІДВІДУВАЧ ---
+    accept(visitor) {
+        visitor.visitElement(this);
+        for (const child of this.children) {
+            child.accept(visitor);
         }
     }
 
@@ -72,7 +98,7 @@ class LightElementNode extends LightNode {
     get outerHTML() { return this.render(); }
 
     onCreated() { console.log(`[Lifecycle]: Створено <${this.tagName}>`); }
-    onBeforeRender() { console.log(`[Lifecycle]: Рендеринг <${this.tagName}>...`); }
+    onBeforeRender() {} // Порожній, щоб не засмічувати консоль
 }
 
 // --- Тестування ---
@@ -91,7 +117,7 @@ table.addChild(tr);
 console.log("\n=== ГЕНЕРАЦІЯ HTML ===");
 console.log(table.outerHTML);
 
-console.log("\n=== ПЕРЕВІРКА ІТЕРАТОРА ===");
-for (const node of table) {
-    if (node.tagName) console.log(`Ітератор знайшов тег: <${node.tagName}>`);
-}
+console.log("\n=== ПЕРЕВІРКА ВІДВІДУВАЧА (Visitor) ===");
+const visitor = new NodeVisitor();
+table.accept(visitor);
+console.log(`Статистика дерева: Знайдено тегів - ${visitor.tagCount}, символів тексту - ${visitor.charCount}`);
