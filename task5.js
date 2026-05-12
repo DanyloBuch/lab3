@@ -8,7 +8,6 @@ class LightNode {
         return html;
     }
 
-    // Хуки життєвого циклу
     onCreated() {}
     onInserted() {}
     onBeforeRender() {}
@@ -22,7 +21,7 @@ class LightTextNode extends LightNode {
     constructor(text) {
         super();
         this.text = text; 
-        this.onCreated(); // Виклик хука
+        this.onCreated();
     }
 
     generateHTML() { return this.text; }
@@ -39,21 +38,28 @@ class LightElementNode extends LightNode {
         this.closingType = closingType; 
         this.cssClasses = cssClasses; 
         this.children = []; 
-        this.onCreated(); // Виклик хука
+        this.onCreated();
     }
 
     addChild(node) {
         this.children.push(node);
-        if (node.onInserted) node.onInserted(); // Виклик хука
+        if (node.onInserted) node.onInserted();
     }
 
-    get childrenCount() {
-        return this.children.length; 
+    // --- ПАТЕРН ІТЕРАТОР ---
+    *[Symbol.iterator]() {
+        yield this; // Повертаємо поточний вузол
+        for (const child of this.children) {
+            if (child instanceof LightElementNode) {
+                yield* child; // Рекурсивно йдемо вглиб
+            } else if (child instanceof LightNode) {
+                yield child;
+            }
+        }
     }
 
-    get innerHTML() {
-        return this.children.map(child => child.outerHTML).join("");
-    }
+    get childrenCount() { return this.children.length; }
+    get innerHTML() { return this.children.map(child => child.outerHTML).join(""); }
 
     generateHTML() {
         const classes = this.cssClasses.length > 0 ? ` class="${this.cssClasses.join(" ")}"` : "";
@@ -65,13 +71,12 @@ class LightElementNode extends LightNode {
 
     get outerHTML() { return this.render(); }
 
-    // Перевизначаємо хуки для логування
     onCreated() { console.log(`[Lifecycle]: Створено <${this.tagName}>`); }
     onBeforeRender() { console.log(`[Lifecycle]: Рендеринг <${this.tagName}>...`); }
 }
 
 // --- Тестування ---
-console.log("=== СТВОРЕННЯ ЕЛЕМЕНТІВ (Спрацюють хуки onCreated) ===");
+console.log("=== СТВОРЕННЯ ЕЛЕМЕНТІВ ===");
 const table = new LightElementNode("table", "block", "double", ["my-table"]);
 const tr = new LightElementNode("tr", "block", "double");
 const td1 = new LightElementNode("td", "inline", "double");
@@ -83,5 +88,10 @@ tr.addChild(td1);
 tr.addChild(td2);
 table.addChild(tr);
 
-console.log("\n=== ГЕНЕРАЦІЯ HTML (Спрацюють хуки onBeforeRender) ===");
+console.log("\n=== ГЕНЕРАЦІЯ HTML ===");
 console.log(table.outerHTML);
+
+console.log("\n=== ПЕРЕВІРКА ІТЕРАТОРА ===");
+for (const node of table) {
+    if (node.tagName) console.log(`Ітератор знайшов тег: <${node.tagName}>`);
+}
