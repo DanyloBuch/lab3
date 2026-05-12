@@ -1,15 +1,24 @@
+// --- ПАТЕРН КОМАНДА (Command) ---
+class AddClassCommand {
+    constructor(node, className) {
+        this.node = node;
+        this.className = className;
+    }
+    execute() {
+        this.node.cssClasses.push(this.className);
+        console.log(`[Command]: Додано клас '${this.className}'`);
+    }
+    undo() {
+        this.node.cssClasses = this.node.cssClasses.filter(c => c !== this.className);
+        console.log(`[Command]: Скасовано додавання класу '${this.className}'`);
+    }
+}
+
 // --- ПАТЕРН ВІДВІДУВАЧ (Visitor) ---
 class NodeVisitor {
-    constructor() {
-        this.tagCount = 0;
-        this.charCount = 0;
-    }
-    visitElement(node) {
-        this.tagCount++;
-    }
-    visitText(textNode) {
-        this.charCount += textNode.text.length;
-    }
+    constructor() { this.tagCount = 0; this.charCount = 0; }
+    visitElement(node) { this.tagCount++; }
+    visitText(textNode) { this.charCount += textNode.text.length; }
 }
 
 // Базовий клас для всіх вузлів
@@ -38,12 +47,9 @@ class LightTextNode extends LightNode {
         this.text = text; 
         this.onCreated();
     }
-
     generateHTML() { return this.text; }
     get outerHTML() { return this.render(); }
     get innerHTML() { return this.text; }
-    
-    // Приймаємо відвідувача
     accept(visitor) { visitor.visitText(this); }
 }
 
@@ -96,13 +102,11 @@ class LightElementNode extends LightNode {
     }
 
     get outerHTML() { return this.render(); }
-
-    onCreated() { console.log(`[Lifecycle]: Створено <${this.tagName}>`); }
-    onBeforeRender() {} // Порожній, щоб не засмічувати консоль
+    onCreated() {} 
+    onBeforeRender() {}
 }
 
 // --- Тестування ---
-console.log("=== СТВОРЕННЯ ЕЛЕМЕНТІВ ===");
 const table = new LightElementNode("table", "block", "double", ["my-table"]);
 const tr = new LightElementNode("tr", "block", "double");
 const td1 = new LightElementNode("td", "inline", "double");
@@ -114,10 +118,12 @@ tr.addChild(td1);
 tr.addChild(td2);
 table.addChild(tr);
 
-console.log("\n=== ГЕНЕРАЦІЯ HTML ===");
-console.log(table.outerHTML);
+console.log("=== ПЕРЕВІРКА КОМАНДИ (Command) ===");
+console.log("До:", table.outerHTML);
 
-console.log("\n=== ПЕРЕВІРКА ВІДВІДУВАЧА (Visitor) ===");
-const visitor = new NodeVisitor();
-table.accept(visitor);
-console.log(`Статистика дерева: Знайдено тегів - ${visitor.tagCount}, символів тексту - ${visitor.charCount}`);
+const highlightCmd = new AddClassCommand(table, "bg-dark");
+highlightCmd.execute(); // Застосовуємо команду
+console.log("Після додавання:", table.outerHTML);
+
+highlightCmd.undo(); // Скасовуємо дію
+console.log("Після скасування (Undo):", table.outerHTML);
